@@ -58,6 +58,11 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import org.jruby.RubyArray;
+import org.jruby.RubyBigDecimal;
+import org.jruby.RubyBignum;
+import org.jruby.RubyBoolean;
+import org.jruby.RubyFixnum;
+import org.jruby.RubyFloat;
 import org.jruby.RubyHash;
 import org.jruby.RubyNumeric;
 import org.jruby.RubyString;
@@ -859,6 +864,37 @@ public class RubyJdbcConnection extends RubyObject {
 
         for(int i=0, j=values.getLength(); i<j; i++) {
             setValue(ps, i+1, context, values.eltInternal(i), types.eltInternal(i));
+        }
+    }
+
+    /*
+     * variant of original setValuesOnPS which doesn't require a types array. we'll figure it out!
+     */
+    private static void setValuesOnPS(PreparedStatement ps, ThreadContext context, IRubyObject valuesArg) throws SQLException {
+        final Ruby runtime = context.getRuntime();
+        RubyArray values = (RubyArray) valuesArg;
+        RubyArray types = runtime.newArray();
+        String className;
+        IRubyObject value;
+        for(int i=0, j=values.getLength(); i<j; i++) {
+            value = values.eltInternal(i);
+            className = null;
+            if (value instanceof RubyString) {
+                className = "string";
+            } else if (value instanceof RubyFixnum || value instanceof RubyBignum) {
+                className = "integer";
+            } else if (value instanceof RubyFloat || value instanceof RubyBigDecimal) {
+                className = "float";
+            } else if (value instanceof RubyTime) {
+                className = "time";
+            } else if (value instanceof RubyBoolean) {
+                className = "boolean";
+            } else if (value.isNil()) {
+                className = "nil";
+            } else {
+                throw new RaiseException(runtime, runtime.getClass("ArgumentError"), "Type: " + value.getType().toString() + " is not supported", false);
+            }
+            setValue(ps, i+1, context, value, runtime.newSymbol(className));
         }
     }
 
