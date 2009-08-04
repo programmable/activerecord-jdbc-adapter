@@ -839,11 +839,9 @@ public class RubyJdbcConnection extends RubyObject {
                 RubyTime rubyTime = (RubyTime) value;
                 java.util.Date date = rubyTime.getJavaDate();
                 long millis = date.getTime();
-                long micros = rubyTime.microseconds() - millis / 1000;
                 java.sql.Timestamp ts = new java.sql.Timestamp(millis);
                 java.util.Calendar cal = Calendar.getInstance();
                 cal.setTime(date);
-                ts.setNanos((int)(micros * 1000));
                 ps.setTimestamp(index, ts, cal);
             }
             break;
