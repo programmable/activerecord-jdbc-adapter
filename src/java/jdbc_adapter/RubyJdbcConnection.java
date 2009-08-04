@@ -1194,4 +1194,88 @@ public class RubyJdbcConnection extends RubyObject {
             return columns;
         }
     }
+
+    /*
+     * takes args:
+     *  sql string
+     *  ruby block
+     * yields block for each row
+     */
+    @JRubyMethod(name = "execute_query_each", required = 1, frame = true)
+    public IRubyObject execute_query_each(final ThreadContext context, final IRubyObject sql, final Block block) throws SQLException {
+        Connection c = getConnection(true);
+        PreparedStatement ps = c.prepareStatement(rubyApi.convertToRubyString(sql).toString());
+        return executeQueryEachInternal(context, ps, block);
+    }
+
+    /*
+     * takes args:
+     *  sql string
+     *  array of values for parameter binding
+     *  ruby block
+     * yields block for each row
+     */
+    @JRubyMethod(name = "execute_query_each", required = 2, frame = true)
+    public IRubyObject execute_query_each(final ThreadContext context, final IRubyObject sql, final IRubyObject values, final Block block) throws SQLException {
+        Connection c = getConnection(true);
+        PreparedStatement ps = c.prepareStatement(rubyApi.convertToRubyString(sql).toString());
+        setValuesOnPS(ps, context, values);
+        return executeQueryEachInternal(context, ps, block);
+    }
+
+    /*
+     * takes args:
+     *  sql string
+     *  array of values for parameter binding
+     *  array of symbols for type casting values (see getTypeValueFor)
+     *  ruby block
+     * yields block for each row
+     */
+    @JRubyMethod(name = "execute_query_each", required = 3, frame = true)
+    public IRubyObject execute_query_each(final ThreadContext context, final IRubyObject sql, final IRubyObject values, final IRubyObject types, final Block block) throws SQLException {
+        Connection c = getConnection(true);
+        PreparedStatement ps = c.prepareStatement(rubyApi.convertToRubyString(sql).toString());
+        setValuesOnPS(ps, context, values, types);
+        return executeQueryEachInternal(context, ps, block);
+    }
+
+    /*
+     * used by execute_query_each
+     * returns number of results processed
+     */
+    private IRubyObject executeQueryEachInternal(final ThreadContext context, final PreparedStatement ps, final Block block) throws SQLException {
+        final Ruby runtime = context.getRuntime();
+        // require a block
+        if (!block.isGiven()) {
+            throw new RaiseException(runtime, runtime.getClass("ArgumentError"), "execute_query_each requires a block", false);
+        }
+        return (IRubyObject) withConnectionAndRetry(context, new SQLBlock() {
+            public Object call(Connection c) throws SQLException {
+                ResultSet rs = null;
+                RubyHash row = RubyHash.newHash(runtime);
+                int numResults = 0;
+
+                try {
+                    rs = ps.executeQuery();
+                    ColumnData[] columns = ColumnData.setup(runtime, c.getMetaData(), rs.getMetaData(), false);
+                    int columnCount = columns.length;
+
+                    while (rs.next()) {
+                        row.clear();
+                        // populate our row hash
+                        for (int i = 0; i < columnCount; i++) {
+                            row.op_aset(context, columns[i].name, jdbcToRuby(runtime, i + 1, columns[i].type, rs));
+                        }
+                        // yield to the block
+                        block.call(context, row);
+                        numResults++;
+                    }
+                } finally {
+                    close(rs);
+                    close(ps);
+                }
+                return runtime.newFixnum(numResults);
+            }
+        });
+    }
 }
