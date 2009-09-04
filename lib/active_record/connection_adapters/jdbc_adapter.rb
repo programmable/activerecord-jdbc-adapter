@@ -491,6 +491,10 @@ module ActiveRecord
       def supports_migrations?
         true
       end
+      
+      def supports_primary_key?
+        true
+      end
 
       def native_database_types #:nodoc:
         @connection.native_database_types
@@ -612,6 +616,10 @@ module ActiveRecord
 
       def rollback_db_transaction
         @connection.rollback
+      end
+
+      def primary_key(table_name)
+        @connection.primary_key(table_name)
       end
 
       def write_large_object(*args)
