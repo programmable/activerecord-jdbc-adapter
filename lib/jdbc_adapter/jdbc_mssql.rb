@@ -266,6 +266,11 @@ module ::JdbcSpec
         sql
       end
 
+      def primary_key(table_name)
+        idcol = identity_column(table_name)
+        idcol ? [idcol.name,nil] : nil
+      end
+
       private
       # Turns IDENTITY_INSERT ON for table during execution of the block
       # N.B. This sets the state of IDENTITY_INSERT to OFF after the
